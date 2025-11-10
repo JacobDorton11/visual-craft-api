@@ -11,18 +11,18 @@ const ROOT = process.cwd();
 app.use(cors());
 app.use(express.json());
 
-// ---------- Explicit static mounts (so images/icons CANNOT be hijacked by SPA) ----------
+// ---------- Explicit static mounts ----------
 const imgDir = path.join(ROOT, 'images');
 const icoDir = path.join(ROOT, 'icons');
 
-// Serve /images/* only from ./images
+// Serve /images/* from ./images ONLY (cannot be hijacked by SPA)
 app.use('/images', express.static(imgDir, { fallthrough: false, extensions: ['jpg','jpeg','png'] }));
 
-// Serve /icons/* only from ./icons (ok if folder doesn’t exist; just won’t match)
+// Serve /icons/* from ./icons (optional)
 app.use('/icons', express.static(icoDir, { fallthrough: true }));
 
 // Serve /manifest.json or /manifest.webmanifest if present
-app.get(['/manifest.json','/manifest.webmanifest'], (req, res, next) => {
+app.get(['/manifest.json','/manifest.webmanifest'], (req, res) => {
   const files = ['manifest.json','manifest.webmanifest'];
   for (const f of files) {
     const p = path.join(ROOT, f);
@@ -31,10 +31,10 @@ app.get(['/manifest.json','/manifest.webmanifest'], (req, res, next) => {
   res.status(404).json({ error: 'manifest not found' });
 });
 
-// ---------- Root static (index.html, css, js loaded from root) ----------
+// Root static files (index.html, etc.)
 app.use(express.static(ROOT, { extensions: ['html'] }));
 
-// ---------- Minimal API so UI works ----------
+// ---------- Minimal API (stubs) ----------
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
@@ -43,9 +43,8 @@ app.post('/api/availability', (req, res) => {
   const now = new Date();
   const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0);
   const slots = [];
-  const stepMin = 90;
   for (let i = 0; i < 6; i++) {
-    const d = new Date(base.getTime() + i * stepMin * 60000);
+    const d = new Date(base.getTime() + i * 90 * 60000);
     if (d.getTime() > now.getTime() + 15 * 60000) slots.push(d.toISOString());
   }
   res.json({ slots, durationMin: 60 });
@@ -80,7 +79,7 @@ app.get('/__list/images', (req, res) => {
   }
 });
 
-// ---------- SPA fallback (MUST be last, and MUST skip /api & our static mounts) ----------
+// ---------- SPA fallback (last; skips /api & our static mounts) ----------
 app.get(/^\/(?!api\/|images\/|icons\/|manifest\.json$|manifest\.webmanifest$).*/, (req, res) => {
   res.sendFile(path.join(ROOT, 'index.html'));
 });
